@@ -66,6 +66,7 @@ pub struct AutoCfg {
     out_dir: PathBuf,
     rustc: PathBuf,
     rustc_version: Version,
+    rustflags: Option<Vec<OsString>>,
     target: Option<OsString>,
     no_std: bool,
 }
@@ -137,6 +138,10 @@ impl AutoCfg {
         let rustc = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
         let rustc: PathBuf = rustc.into();
         let rustc_version = try!(Version::from_rustc(&rustc));
+        let rustflags = env::var("RUSTFLAGS")
+            .ok()
+            .map(|flags| flags.split(' ').map(|s| s.into()).collect());
+        println!("{:?}", rustflags);
 
         // Sanity check the output directory
         let dir = dir.into();
@@ -151,6 +156,7 @@ impl AutoCfg {
             rustc_version: rustc_version,
             target: env::var_os("TARGET"),
             no_std: false,
+            rustflags,
         };
 
         // Sanity check with and without `std`.
@@ -197,6 +203,12 @@ impl AutoCfg {
         if let Some(target) = self.target.as_ref() {
             command.arg("--target").arg(target);
         }
+
+        if let Some(flags) = self.rustflags.as_ref() {
+            command.args(flags);
+        }
+
+        eprintln!("{:?}", command);
 
         command.arg("-").stdin(Stdio::piped());
         let mut child = try!(command.spawn().map_err(error::from_io));
